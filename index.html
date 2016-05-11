@@ -1,0 +1,363 @@
+<!doctype html>
+<html>
+  <head>
+    <title>RPG Chatting</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 23px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(255, 193, 158); border: none; padding: 10px; font-size: 18px; font-weight: bold;}
+      #chatting_list { list-style-type: none; margin: 0; padding: 0; }
+      #chatting_list li { padding: 5px 10px; }
+      #chatting_list li:nth-child(odd) { background: #eee; }
+      .canvas_area {
+        text-align: center;
+      }
+      .chatList {
+        border: 1px solid red;
+      }
+    </style>
+
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+
+  </head>
+
+
+  <body>
+    <div class="canvas_area">
+      <script>
+      var WIDTH = 1200;
+      var HEIGHT = 300;
+      var KEY_UP = 38;
+      var KEY_DOWN = 40;
+      var KEY_RIGHT = 39;
+      var KEY_LEFT = 37;
+      var KEY_SPACE = 32;
+      var PI = Math.PI;
+      var gravity = 0.25;
+
+      var canvas = document.createElement('canvas');
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      canvas.style.border = "black 1px solid";
+      $('.canvas_area').append(canvas);
+
+      var ctx = canvas.getContext("2d");
+
+      Human = function(color){
+      	this.x = WIDTH/2,
+      	this.y = HEIGHT/2,
+      	this.height = 60,
+      	this.width = 27,
+      	this.color = color,
+      	this.lookingAt = "right",
+      	this.body = {
+      		position : {x:null, y:null},
+      		head : {x:null, y:null, size:null},
+      		mouth : {start:null, end:null},
+      		neck : {x:null, y:null},
+      		shoulder : {x:null, y:null},
+      		hip : {x:null, y:null},
+      		leftHand : {x:null, y:null},
+      		righthand : {x:null, y:null},
+      		leftFoot : {x:null, y:null},
+      		rightFoot : {x:null, y:null},
+      	},
+
+      	this.stand = function(){
+      		this.body.position = { x: this.x+this.width/2, y: this.y+this.height-this.jumpData.height};
+      		this.body.head = { x: this.body.position.x, y:this.body.position.y-this.height+10, size:10};
+      		if(this.lookingAt=="right") this.body.mouth = { start: PI*2.1, end: PI*1.9};
+      		if(this.lookingAt=="left") this.body.mouth = { start: PI*1.1, end: PI*0.9};
+      		this.body.neck = { x: this.body.position.x, y: this.body.position.y-this.height+22};
+      		this.body.shoulder = { x: this.body.position.x, y: this.body.position.y-this.height+25};
+      		this.body.hip = { x: this.body.position.x, y: this.body.position.y-this.height+40};
+      		this.body.leftHand = { x: this.body.position.x-10, y: this.body.position.y-this.height+40};
+      		this.body.righthand = { x: this.body.position.x+10, y: this.body.position.y-this.height+40};
+      		this.body.leftFoot = { x: this.body.position.x-10, y: this.body.position.y-this.height+60};
+      		this.body.rightFoot = { x: this.body.position.x+10, y: this.body.position.y-this.height+60};
+      		if(this.walkData.status== false) this.walkData.animation.reset();
+      	},
+      	this.walk = function(toward){
+      		this.walkData.status = true;
+      		switch(toward){
+      			case "right":
+      			this.lookingAt = toward;
+      			if(this==player&&moveKeyCheck(1,0,1,0)) this.x++;
+      			else this.x+= 2;
+      			if(this==player&&moveKeyCheck(1,0,1,1)) return;
+      			break;
+
+      			case "left":
+      			this.lookingAt = toward;
+      			if(this==player&&moveKeyCheck(1,0,1,0)) this.x--;
+      			else this.x-= 2;
+      			if(this==player&&moveKeyCheck(1,1,1,0)) return;
+      			break;
+
+      			case "up":
+      			if(this==player&&moveKeyCheck(0,0,1,0)) return;
+      			this.y-=2;
+      			break;
+
+      			case "down":
+      			if(this==player&&moveKeyCheck(1,0,0,0)) return;
+      			this.y+=2;
+      			break;
+
+      			case "stop":
+      			return;
+      		}
+      		if(this.jumpData.status==false){
+      			this.walkData.animation.fomula();
+      			this.body.leftFoot.x = this.body.position.x-(5+this.walkData.animation.stride);
+      			this.body.rightFoot.x = this.body.position.x+(5+this.walkData.animation.stride);
+      		}
+      	},
+      	this.walkData = {
+      		status: false,
+      		animation: {length:10, stride:5, fomula:function(){
+      			if(this.length > 5) this.stride--;
+      			else if(this.length >= 0) this.stride++;
+      			if(--this.length == 0) this.length = 10;
+      		}, reset: function(){this.length = 10, this.stride = 5}},
+      	},
+      	this.jump = function(){
+      		switch(this.jumpData.status){
+      			case false :
+      			this.jumpData.velocity = this.jumpData.power;
+      			this.jumpData.status = true;
+      			break;
+
+      			case true:
+      			this.jumpData.velocity -= gravity;
+      			this.jumpData.height += this.jumpData.velocity;
+      			if(this.jumpData.height <= 0){
+      				this.jumpData.status = false;
+      				this.jumpData.height = 0;
+      			}
+      			break;
+      		}
+
+      		ctx.save();
+      		ctx.fillStyle="#000";
+      		ctx.font = "20px Georgia";
+      		ctx.fillText("Yay!", this.body.position.x, this.body.position.y-this.height-20);
+      		ctx.restore();
+      		this.body.shoulder.y = this.body.position.y-this.height+30;
+
+      		this.body.leftHand.y = this.body.righthand.y = this.body.position.y-this.height+20;
+      		if(this.lookingAt=="left"){
+      			this.body.leftFoot = {x:this.body.position.x-15, y:this.body.position.y-this.height+45};
+      			this.body.rightFoot = {x:this.body.position.x+15, y:this.body.position.y-this.height+50};
+      		}
+      		if(this.lookingAt=="right"){
+      			this.body.leftFoot = {x:this.body.position.x-15, y:this.body.position.y-this.height+50};
+      			this.body.rightFoot = {x:this.body.position.x+15, y:this.body.position.y-this.height+45};
+      		}
+      	},
+      	this.jumpData = {
+      		height: 0,      // 시작 높이
+      		power: 3,       // 뛰어오르는 정도
+      		velocity: 0,    // 속도
+      		status: false   // 상태
+      	},
+      	this.drawSelf = function(){
+
+      		ctx.save();
+
+      		drawEllipsePath(this.body.position.x, this.y+this.height, this.width, this.width/4);
+      		ctx.fillStyle = "rgba(0,0,0,0.5)";
+      		ctx.fill();
+
+      		ctx.fillStyle = this.color;
+      		ctx.strokeStyle = this.color;
+
+      		ctx.beginPath();
+      		ctx.moveTo(this.body.head.x,this.body.head.y);
+      		ctx.arc(this.body.head.x,this.body.head.y,this.body.head.size,this.body.mouth.start,this.body.mouth.end,false);
+      		ctx.closePath();
+      		ctx.fill();
+
+      		ctx.beginPath();
+      		ctx.lineWidth=5;
+
+      		ctx.moveTo(this.body.neck.x,this.body.neck.y);
+      		ctx.lineTo(this.body.hip.x,this.body.hip.y);
+
+      		ctx.moveTo(this.body.hip.x,this.body.hip.y);
+      		ctx.lineTo(this.body.leftFoot.x,this.body.leftFoot.y);
+
+      		ctx.moveTo(this.body.hip.x,this.body.hip.y);
+      		ctx.lineTo(this.body.rightFoot.x,this.body.rightFoot.y);
+
+      		ctx.moveTo(this.body.shoulder.x,this.body.shoulder.y);
+      		ctx.lineTo(this.body.leftHand.x,this.body.leftHand.y);
+
+      		ctx.moveTo(this.body.shoulder.x,this.body.shoulder.y);
+      		ctx.lineTo(this.body.righthand.x,this.body.righthand.y);
+      		ctx.stroke();
+
+      		ctx.restore();
+      	}
+      }
+
+      var player = new Human("#402000");
+      player.update = function(){
+      	this.stand();
+      	if(keystate[KEY_UP]){
+      		player.walk("up");
+      	}
+      	if(keystate[KEY_DOWN]){
+      		player.walk("down");
+      	}
+      	if(keystate[KEY_RIGHT]){
+      		player.walk("right");
+      	}
+      	if(keystate[KEY_LEFT]){
+      		player.walk("left");
+      	}
+      	if(player.jumpData.status == false && keystate[KEY_SPACE]){
+      		player.jump();
+      	}
+      	if(this.jumpData.status == true){
+      		this.jump();
+      	}
+
+      	if(keystate[KEY_UP]===undefined && keystate[KEY_DOWN]===undefined && keystate[KEY_RIGHT]===undefined && keystate[KEY_LEFT]===undefined){
+      		this.walkData.status=false;
+      	}
+
+      	if(this.x+this.width>WIDTH) this.x=WIDTH-this.width;
+      	if(this.x<0) this.x=0
+      	if(this.y<60) this.y=60;
+      	if(this.y+this.height>HEIGHT) this.y=HEIGHT-this.height;
+      };
+
+
+      var cpu = new Human("#707040");
+      cpu.cpuData={ walkValue : 100, jumpValue : 38, moveTo : "right"};
+      cpu.update = function(){
+      	this.stand();
+      	if(this.cpuData.walkValue>0) this.cpuData.walkValue--;
+      	else {
+      		var randomNumber = Math.random();
+      		if(randomNumber<0.2) this.cpuData.moveTo = "left";
+      		else if(randomNumber<0.4) this.cpuData.moveTo = "right";
+      		else if(randomNumber<0.6) this.cpuData.moveTo = "up";
+      		else if(randomNumber<0.8) this.cpuData.moveTo = "down";
+      		else if(randomNumber<0.1) this.cpuData.moveTo = "stop";
+      		this.cpuData.walkValue=100;
+      	}
+      	this.walk(this.cpuData.moveTo);
+
+      	if(this.cpuData.jumpValue>0) this.cpuData.jumpValue--;
+      	else{
+      		var randomNumber = Math.random();
+      		if(randomNumber<0.5) this.jump();
+      		this.cpuData.jumpValue=38;
+      	}
+
+      	if(this.jumpData.status == true){
+      		this.jump();
+      	}
+
+      	if(this.x+this.width>WIDTH){
+      		this.x=WIDTH-this.width;
+      		this.cpuData.moveTo = "left";
+      	}
+      	if(this.x<0){
+      		this.x=0
+      		this.cpuData.moveTo = "right";
+      	}
+      	if(this.y<60){
+      		this.y=60;
+      		this.cpuData.moveTo = "down";
+      	}
+      	if(this.y+this.height>HEIGHT){
+      		this.y=HEIGHT-this.height;
+      		this.cpuData.moveTo = "up";
+      	}
+      };
+
+      function main(){
+      	draw();
+      	update();
+      }
+      function update(){
+      	player.update();
+      	cpu.update();
+      }
+      function draw(){
+      	ctx.save();
+      	ctx.lineWidth=1;
+      	ctx.fillStyle = "rgba(245,245,245, 1)";
+      	ctx.fillRect (0,0,WIDTH,HEIGHT);
+      	ctx.restore();
+
+      	if(player.y<cpu.y){
+      		player.drawSelf();
+      		cpu.drawSelf();
+      	}
+      	else{
+      		cpu.drawSelf();
+      		player.drawSelf();
+      	}
+      }
+      function moveKeyCheck(up, right, down, left){
+      	if(up && keystate[KEY_UP]) return true;
+      	if(right && keystate[KEY_RIGHT]) return true;
+      	if(down && keystate[KEY_DOWN]) return true;
+      	if(left && keystate[KEY_LEFT]) return true;
+      	return false;
+      }
+      function drawEllipsePath(centerX, centerY, width, height) {
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - height/2);
+        ctx.bezierCurveTo(
+          centerX + width/2, centerY - height/2,
+          centerX + width/2, centerY + height/2,
+          centerX, centerY + height/2);
+        ctx.bezierCurveTo(
+          centerX - width/2, centerY + height/2,
+          centerX - width/2, centerY - height/2,
+          centerX, centerY - height/2);
+        ctx.closePath();
+      }
+      var keystate = {};
+      window.onload = function(){
+      	setInterval(main, 20);
+      	document.addEventListener("keydown", function(e){
+      		keystate[e.keyCode] = true;
+      		// console.log(e.keyCode);
+      	});
+      	document.addEventListener("keyup", function(e){
+      		delete keystate[e.keyCode];
+      	});
+      }
+      </script>
+    </div>
+    <div class="chatList">
+      <ul id="chatting_list"></ul>
+    </div>
+    <form action="">
+      <input id="chatting_input" autocomplete="off" /><button id="button">전송</button>
+    </form>
+
+    <script>
+      var socket = io();
+      $('#button').click(function(){
+        socket.emit('chat message', $('#chatting_input').val());
+        $('#chatting_input').val('');
+        return false;
+      });
+      socket.on('chat message', function(msg){
+        $('#chatting_list').append($('<li>').text(msg));
+      });
+    </script>
+  </body>
+
+
+</html>
