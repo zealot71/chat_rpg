@@ -237,58 +237,12 @@
       };
 
 
-      var cpu = new Human("#707040");
-      cpu.cpuData={ walkValue : 100, jumpValue : 38, moveTo : "right"};
-      cpu.update = function(){
-      	this.stand();
-      	if(this.cpuData.walkValue>0) this.cpuData.walkValue--;
-      	else {
-      		var randomNumber = Math.random();
-      		if(randomNumber<0.2) this.cpuData.moveTo = "left";
-      		else if(randomNumber<0.4) this.cpuData.moveTo = "right";
-      		else if(randomNumber<0.6) this.cpuData.moveTo = "up";
-      		else if(randomNumber<0.8) this.cpuData.moveTo = "down";
-      		else if(randomNumber<0.1) this.cpuData.moveTo = "stop";
-      		this.cpuData.walkValue=100;
-      	}
-      	this.walk(this.cpuData.moveTo);
-
-      	if(this.cpuData.jumpValue>0) this.cpuData.jumpValue--;
-      	else{
-      		var randomNumber = Math.random();
-      		if(randomNumber<0.5) this.jump();
-      		this.cpuData.jumpValue=38;
-      	}
-
-      	if(this.jumpData.status == true){
-      		this.jump();
-      	}
-
-      	if(this.x+this.width>WIDTH){
-      		this.x=WIDTH-this.width;
-      		this.cpuData.moveTo = "left";
-      	}
-      	if(this.x<0){
-      		this.x=0
-      		this.cpuData.moveTo = "right";
-      	}
-      	if(this.y<60){
-      		this.y=60;
-      		this.cpuData.moveTo = "down";
-      	}
-      	if(this.y+this.height>HEIGHT){
-      		this.y=HEIGHT-this.height;
-      		this.cpuData.moveTo = "up";
-      	}
-      };
-
       function main(){
       	draw();
       	update();
       }
       function update(){
       	player.update();
-      	cpu.update();
       }
       function draw(){
       	ctx.save();
@@ -297,14 +251,10 @@
       	ctx.fillRect (0,0,WIDTH,HEIGHT);
       	ctx.restore();
 
-      	if(player.y<cpu.y){
-      		player.drawSelf();
-      		cpu.drawSelf();
-      	}
-      	else{
-      		cpu.drawSelf();
-      		player.drawSelf();
-      	}
+    		player.drawSelf();
+
+    		player.drawSelf();
+
       }
       function moveKeyCheck(up, right, down, left){
       	if(up && keystate[KEY_UP]) return true;
